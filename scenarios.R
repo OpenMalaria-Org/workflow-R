@@ -96,10 +96,18 @@ write_scenarios <- function(mapping, scenarios, experiment_folder, om,
     stop("Could not create: ", xml_folder)
   }
 
+  xml <- paste(readLines(mapping$scaffold, warn = FALSE), collapse = "\n")
+  
+  xml <- sub(
+    "http://openmalaria.org/schema/scenario_[0-9]+",
+    paste0("http://openmalaria.org/schema/scenario_", om$version),
+    xml
+  )
+  
   for (row in seq_len(nrow(scenarios))) {
     index <- scenarios$index[row]
-
-    doc <- xml2::read_xml(mapping$scaffold)
+    
+    doc <- xml2::read_xml(xml)
     root <- xml2::xml_root(doc)
 
     xml2::xml_set_attr(root, "schemaVersion", om$version)
