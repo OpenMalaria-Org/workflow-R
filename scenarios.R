@@ -1,6 +1,14 @@
 is_xml <- function(x) inherits(x, c("xml_node", "xml_nodeset"))
 
-s <- function(scaffold, ...) {
+variable <- function(x) {
+  x <- substitute(x)
+  if (!is.symbol(x)) stop("variable() must contain a column name")
+  structure(as.character(x), class = "scenario_variable")
+}
+
+is_variable <- function(x) inherits(x, "scenario_variable")
+
+create_template <- function(scaffold, ...) {
   replacements <- list(...)
 
   if (length(replacements) &&
@@ -8,69 +16,38 @@ s <- function(scaffold, ...) {
     stop('Name each replacement with its XPath, e.g. "demography/@popSize" = 200')
   }
 
-  valid <- function(x) is_xml(x) || length(x) == 1 &&
-    (!is.list(x) ||
-       length(names(x)) == 1 &&
-       nzchar(names(x)) &&
-       length(x[[1]]) > 0)
+  valid <- function(x) is_xml(x) || is_variable(x) || length(x) == 1 && !is.list(x)
 
   if (!all(vapply(replacements, valid, logical(1)))) {
-    stop("Use scalar or XML fixed values, or list(name = values) for varying values")
+    stop("Use scalar or XML fixed values, or variable(name) for scenario variables")
   }
 
   list(scaffold = scaffold, replacements = replacements)
 }
 
 
-mapping_variables <- function(mapping) {
-  variables <- unname(Filter(
-    function(x) is.list(x) && !is_xml(x),
-    mapping$replacements
-  ))
-
-  if (!length(variables)) return(list())
-
-  variables <- do.call(c, variables)
-  variables[!duplicated(names(variables), fromLast = TRUE)]
+template_variables <- function(template) {
+  variables <- Filter(is_variable, template$replacements)
+  unique(vapply(variables, as.character, character(1)))
 }
 
 
-create_scenarios <- function(mapping) {
-  variables <- mapping_variables(mapping)
-
-  if (!length(variables)) {
-    return(data.table::data.table(index = 1L))
-  }
-
-  scenarios <- data.table::as.data.table(expand.grid(
-    variables,
-    KEEP.OUT.ATTRS = FALSE,
-    stringsAsFactors = FALSE
-  ))
-
-  scenarios[, index := .I]
-  data.table::setcolorder(scenarios, "index")
-
-  scenarios
-}
-
-
-write_scenarios <- function(mapping, scenarios, experiment_folder, om,
+write_scenarios <- function(template, scenarios, experiment_folder, om,
                             validate_xml = TRUE, overwrite = FALSE) {
 
   if (!"index" %in% names(scenarios)) {
-    stop("scenarios must contain an index column")
+    stop("The scenarios table must contain an index column")
   }
 
   if (anyNA(scenarios$index) || anyDuplicated(scenarios$index)) {
-    stop("scenario indices must be unique and non-missing")
+    stop("The scenario indices must be unique and non-missing")
   }
 
-  variables <- mapping_variables(mapping)
-  missing <- setdiff(names(variables), names(scenarios))
+  variables <- template_variables(template)
+  missing <- setdiff(variables, names(scenarios))
 
   if (length(missing)) {
-    stop("Missing scenario columns: ", paste(missing, collapse = ", "))
+    stop("The following variables were mapped but are missing from the scenarios table: ", paste(missing, collapse = ", "))
   }
 
   if (validate_xml) {
@@ -96,7 +73,7 @@ write_scenarios <- function(mapping, scenarios, experiment_folder, om,
     stop("Could not create: ", xml_folder)
   }
 
-  xml <- paste(readLines(mapping$scaffold, warn = FALSE), collapse = "\n")
+  xml <- paste(readLines(template$scaffold, warn = FALSE), collapse = "\n")
   
   xml <- sub(
     "http://openmalaria.org/schema/scenario_[0-9]+",
@@ -116,14 +93,14 @@ write_scenarios <- function(mapping, scenarios, experiment_folder, om,
       " scenario_", om$version, ".xsd"
     ))
 
-    for (replacement in seq_along(mapping$replacements)) {
-      path <- names(mapping$replacements)[replacement]
-      value <- mapping$replacements[[replacement]]
+    for (replacement in seq_along(template$replacements)) {
+      path <- names(template$replacements)[replacement]
+      value <- template$replacements[[replacement]]
 
-      # list(name = values) means:
+      # variable(name) means:
       # use the value from scenarios$name for this row
-      if (is.list(value) && !is_xml(value)) {
-        value <- scenarios[[names(value)]][row]
+      if (is_variable(value)) {
+        value <- scenarios[[as.character(value)]][row]
       }
 
       nodes <- xml2::xml_find_all(root, path, xml2::xml_ns(doc))

@@ -55,37 +55,6 @@ run <- function(scenarios, experiment_folder, om, slurm = NULL, overwrite = FALS
     if (is.null(slurm)) run_local(commands, experiment_folder, om, local_cores) else run_slurm(commands, experiment_folder, om, slurm)
 }
 
-extract <- function(scenarios, experiment_folder, overwrite = FALSE)
-{
-    message("Extracting results...")
-    output_file = file.path(experiment_folder, "output.csv")
-    if (file.exists(output_file) && !overwrite) stop("Output file already exists: ", output_file, ". Use overwrite = TRUE to replace it.")
-    
-    if (!"outputFile" %in% names(scenarios)) {
-        scenarios = fread(file.path(experiment_folder, "scenarios.csv"))
-    }
-    
-    start.time <- Sys.time()
-    df = to_df(scenarios, experiment_folder)
-    end.time <- Sys.time()
-    time.taken <- end.time - start.time
-    message("Extract time: ", time.taken)
-    
-    if(nrow(df) == 0) {
-        message("Error: extraction failed, output dataframe is empty")
-        message("       output.csv not saved")
-    }
-    else {
-        start.time <- Sys.time()
-        fwrite(df, output_file)
-        end.time <- Sys.time()
-        time.taken <- end.time - start.time
-        message("Write time: ", time.taken)
-    }
-    
-    invisible(df)
-}
-
 run_slurm <- function(commands, experiment_folder, om, slurm)
 {
     prepare(experiment_folder, om)
