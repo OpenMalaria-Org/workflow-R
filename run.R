@@ -9,6 +9,7 @@ create_commands <- function(scenarios, experiment_folder, om)
     commands = list()
     output_format = sub("\\.gz$", "", om$output_format)
     compress_output = endsWith(om$output_format, ".gz")
+    has_output_format = om$version >= 50 # the --output-format option was added in version 50
 
     for(row in seq_len(nrow(scenarios)))
     {
@@ -17,11 +18,18 @@ create_commands <- function(scenarios, experiment_folder, om)
         exe <- file.path(om$path, if (.Platform$OS.type == "windows") "openMalaria.exe" else "openMalaria")
         args = c(
             shQuote(exe),
-            "-s", shQuote(file.path("xml", paste0(index, ".xml"))),
-            "--output-format", output_format,
-            if (compress_output) "--compress-output",
-            "--output", shQuote(outputfile)
+            "-s", shQuote(file.path("xml", paste0(index, ".xml")))
         )
+        if (has_output_format) {
+            args = c(args, "--output-format", output_format)
+        } else if (compress_output) {
+            # older builds append ".gz" to the --output file themselves
+            outputfile = sub("\\.gz$", "", outputfile)
+        }
+        if (compress_output) {
+            args = c(args, "--compress-output")
+        }
+        args = c(args, "--output", shQuote(outputfile))
         command = paste(args, collapse = " ")
         commands = append(commands, command)
     }
@@ -33,6 +41,11 @@ create_commands <- function(scenarios, experiment_folder, om)
 run <- function(scenarios, experiment_folder, om, slurm = NULL, overwrite = FALSE, local_cores = NULL)
 {
     if (!om$output_format %in% c("bin", "bin.gz", "txt", "txt.gz")) stop("Unknown output_format: ", om$output_format)
+
+    if (om$version < 50 && om$output_format %in% c("bin", "bin.gz")) {
+        stop("Binary output requires OpenMalaria version >= 50 (output_format='", om$output_format,
+             "' but version=", om$version, "). Use output_format='txt' or 'txt.gz'.")
+    }
 
     xml_files = file.path(experiment_folder, "xml", paste0(scenarios$index, ".xml"))
     if (!all(file.exists(xml_files))) stop("Scenario XML files are missing. Run write_scenarios() first.")
