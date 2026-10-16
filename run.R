@@ -113,12 +113,16 @@ run_local <- function(commands, experiment_folder, om, cores = NULL)
     
     logfile <- file.path("log", paste0("job_", i, ".log"))
     
-    shell <- if (.Platform$OS.type == "windows") "cmd" else "bash"
-    flag  <- if (.Platform$OS.type == "windows") "/c"  else "-c"
-    
-    # Must quote entire command string for redirection to work
-    cmd_full <- paste(cmd, ">", shQuote(logfile), "2>&1")
-    exitcode <- system2(shell, paste(flag, shQuote(cmd_full)), stdout = NULL, stderr = NULL, wait = TRUE)
+    if (.Platform$OS.type == "windows") {
+      # cmd.exe does not understand the \" escapes produced by shQuote() on the whole
+      # command: wrap it in one extra pair of quotes instead, which cmd /c strips again
+      cmd_full <- paste0('"', cmd, ' > "', gsub("/", "\\\\", logfile), '" 2>&1"')
+      exitcode <- system2("cmd", c("/c", cmd_full), stdout = NULL, stderr = NULL, wait = TRUE)
+    } else {
+      # Must quote entire command string for redirection to work
+      cmd_full <- paste(cmd, ">", shQuote(logfile), "2>&1")
+      exitcode <- system2("bash", paste("-c", shQuote(cmd_full)), stdout = NULL, stderr = NULL, wait = TRUE)
+    }
     
     if (exitcode != 0) {
       msg = paste0("Error in task ", i, ": ", cmd, "\n  See log: ", logfile)
