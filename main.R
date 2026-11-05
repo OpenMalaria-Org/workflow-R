@@ -25,9 +25,9 @@ slurm = list(
 if (!nzchar(Sys.which("sbatch"))) slurm <- NULL # slurm = NULL if not available, e.g. running on a laptop
 
 om = list(
-    version = 50,
-    path = normalizePath("../fork/openMalaria-50.0"),
-    output_format = "bin.gz" # "bin", "bin.gz", "txt", or "txt.gz"
+    version = 49,
+    path = "path_to_openmalaria_release", # where the executable openMalaria lives
+    output_format = "txt" # "bin", "bin.gz", "txt", or "txt.gz"
 )
 
 experiment_folder = "experiment"
