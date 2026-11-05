@@ -4,7 +4,7 @@ source("scenarios.R")
 source("extract.R")
 source("run.R")
 
-pacman::p_load(data.table, xml2, lhs, ggplot2, patchwork)
+pacman::p_load(data.table, xml2, lhs, nanoparquet)
 
 # IMPORTANT: If using Slurm, check and adapt job.sh to your system
 slurm = list(
@@ -47,7 +47,7 @@ template <- create_template(
     "snippets/base.xml",
     
     # Fixed parameters
-    "demography/@popSize" = 1000,
+    "demography/@popSize" = 2000,
     "monitoring/@startDate" = "1950-01-01", # 50 years burnin (start date - 50 years)
     "monitoring/surveys/surveyTime" = "2000-01-01", # start date
     "monitoring/surveys/surveyTime/@repeatStep" = "5d", # survey every 5d (1y is also common)
@@ -100,54 +100,4 @@ write_scenarios(template, scenarios, experiment_folder, om, validate_xml = TRUE,
 run(scenarios, experiment_folder, om, slurm, overwrite = FALSE)
 df <- extract(scenarios, experiment_folder, overwrite = FALSE)
 
-# The workflow ends here.
-
-# Example plotting
-##################
-
-# Load saved results if starting from an existing experiment folder
-scenarios <- fread(file.path(experiment_folder, "scenarios.csv"))
-df <- readRDS(file.path(experiment_folder, "output.rds"))
-
-d = df[complete.cases(df), ] # remove NA values
-d = d[!d$survey == 1,] # remove first survey (due to accumulating data during the burn-in period)
-d = d[, .(value = sum(value)), by = .(index, measure, survey)] # aggregate age-groups
-
-# merge with the scenarios table to have all the metadata (eir, access, seed, etc.) in the same data.table
-d = merge(d, scenarios, by = 'index')
-setorder(d, eir, seed, survey, measure)
-
-nPatent = d[measure == 3]
-nUncomp = d[measure == 14]
-nHost = d[measure == 0]
-inputEIR = d[measure == 35]
-simulatedEIR = d[measure == 36]
-
-prevalence = copy(nPatent)
-prevalence[, value := nPatent$value / nHost$value]
-
-incidence = copy(nUncomp)
-incidence[, value := nUncomp$value / nHost$value]
-
-p_prevalence = ggplot(prevalence, aes(survey, value, color = factor(eir), group = eir)) +
-    stat_summary(fun = mean, geom = "line") +
-    labs(x = "Survey", y = "Prevalence", color = "EIR") +
-    theme_minimal(base_size = 14)
-
-p_incidence = ggplot(incidence, aes(survey, value, color = factor(eir), group = eir)) +
-    stat_summary(fun = mean, geom = "line") +
-    labs(x = "Survey", y = "Clinical Incidence", color = "EIR") +
-    theme_minimal(base_size = 14)
-
-eir = rbind(
-    copy(inputEIR)[, type := "input"],
-    copy(simulatedEIR)[, type := "simulated"]
-)
-
-p_eir = ggplot(eir, aes(survey, value, color = factor(eir), linetype = type, group = interaction(eir, type))) +
-    stat_summary(fun = mean, geom = "line") +
-    labs(x = "Survey", y = "EIR", color = "EIR", linetype = "") +
-    theme_minimal(base_size = 14)
-
-p = p_prevalence / p_incidence / p_eir
-print(p)
+# The workflow ends here. See example.plot.R for an example of how to use the data.

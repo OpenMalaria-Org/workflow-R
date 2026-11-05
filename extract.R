@@ -87,21 +87,31 @@ to_df <- function(scenarios, experiment_folder)
         message("       Check the log files and make sure OpenMalaria is able to run")
     }
 
-    data
+    list(df = data, complete = infoCount == 0 && nrow(data) > 0)
 }
 
-extract <- function(scenarios, experiment_folder, overwrite = FALSE)
+cleanup <- function(experiment_folder)
+{
+    unlink(file.path(experiment_folder, c("xml", "out", "log")), recursive = TRUE)
+    for (pattern in c("commands.txt", "start_array_job.sh", "densities.csv", "scenario_.*\\.xsd")) {
+        files = list.files(experiment_folder, pattern = paste0("^", pattern, "$"))
+        unlink(file.path(experiment_folder, files))
+    }
+}
+
+extract <- function(scenarios, experiment_folder, overwrite = FALSE, remove_temp_files = TRUE)
 {
     message("Extracting results...")
-    output_file = file.path(experiment_folder, "output.rds")
+    output_file = file.path(experiment_folder, "output.parquet")
     if (file.exists(output_file) && !overwrite) stop("Output file already exists: ", output_file, ". Use overwrite = TRUE to replace it.")
     
     if (!"outputFile" %in% names(scenarios)) {
-        scenarios = fread(file.path(experiment_folder, "scenarios.csv"))
+        scenarios = nanoparquet::read_parquet(file.path(experiment_folder, "scenarios.parquet"))
     }
     
     start.time <- Sys.time()
-    df = to_df(scenarios, experiment_folder)
+    result = to_df(scenarios, experiment_folder)
+    df = result$df
     end.time <- Sys.time()
     time.taken <- end.time - start.time
     message("Extract time: ", time.taken)
@@ -112,10 +122,16 @@ extract <- function(scenarios, experiment_folder, overwrite = FALSE)
     }
     else {
         start.time <- Sys.time()
-        saveRDS(df, output_file)
+        nanoparquet::write_parquet(df, output_file)
         end.time <- Sys.time()
         time.taken <- end.time - start.time
         message("Write time: ", time.taken)
+
+        # Temporary files are removed only if every scenario output was extracted
+        if (remove_temp_files && result$complete) {
+            message("Removing temporary files...")
+            cleanup(experiment_folder)
+        }
     }
     
     invisible(df)

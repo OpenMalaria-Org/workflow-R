@@ -59,7 +59,7 @@ run <- function(scenarios, experiment_folder, om, slurm = NULL, overwrite = FALS
     if (!all(vapply(folders, dir.create, logical(1), recursive=TRUE))) stop("Could not create output folders")
 
     scenarios$outputFile = file.path("out", paste0(scenarios$index, ".", om$output_format))
-    fwrite(scenarios, file.path(experiment_folder, "scenarios.csv"))
+    nanoparquet::write_parquet(scenarios, file.path(experiment_folder, "scenarios.parquet"))
     
     message("Creating commands...")
     commands = create_commands(scenarios, experiment_folder, om)
