@@ -1,6 +1,6 @@
 # OpenMalaria Workflow
 
-Run large parameter sweeps of [OpenMalaria](https://github.com/openmalaria/openmalaria) simulations with a few lines of code. Outputs are aggregated into a single [Parquet](https://parquet.apache.org/) file that you can easily read and processed (example included).
+Run large parameter sweeps of [OpenMalaria](https://github.com/openmalaria/openmalaria) simulations with a few lines of code. Outputs are aggregated into a single [Parquet](https://parquet.apache.org/) file that you can easily read and process (example included).
 
 Available in [R](https://github.com/OpenMalaria-Org/workflow-R) and [Python](https://github.com/OpenMalaria-Org/workflow-Python). Same API, same workflow.
 
