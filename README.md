@@ -55,11 +55,6 @@ df <- nanoparquet::read_parquet("experiment/output.parquet")
 df <- merge(df, nanoparquet::read_parquet("experiment/scenarios.parquet"), by = "index")
 ```
 
-```python
-df = pd.read_parquet("experiment/output.parquet")
-df = df.merge(pd.read_parquet("experiment/scenarios.parquet"), on="index")
-```
-
 ## Requirements
 
 - An [OpenMalaria](https://github.com/openmalaria/openmalaria) release (path set in the `om` config)
